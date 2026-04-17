@@ -62,6 +62,7 @@ async fn run(cli: Cli) -> Result<(), zb_core::Error> {
                 &mut installer,
                 formulas,
                 no_link,
+                true,
                 build_from_source,
                 &mut ui,
             )

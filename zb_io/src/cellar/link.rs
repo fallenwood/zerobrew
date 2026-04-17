@@ -189,21 +189,24 @@ impl Linker {
         }
     }
 
-    pub fn link_keg(&self, keg_path: &Path) -> Result<Vec<LinkedFile>, Error> {
-        self.check_conflicts(keg_path)?;
+    pub fn link_keg(&self, keg_path: &Path, force: bool) -> Result<Vec<LinkedFile>, Error> {
+        if !force {
+            self.check_conflicts(keg_path)?;
+        }
+
         self.link_opt(keg_path)?;
         let mut linked = Vec::new();
         for dir_name in LINK_DIRS {
             let src_dir = keg_path.join(dir_name);
             let dst_dir = self.prefix.join(dir_name);
             if src_dir.exists() {
-                linked.extend(Self::link_recursive(&src_dir, &dst_dir)?);
+                linked.extend(Self::link_recursive(&src_dir, &dst_dir, force)?);
             }
         }
         Ok(linked)
     }
 
-    fn link_recursive(src: &Path, dst: &Path) -> Result<Vec<LinkedFile>, Error> {
+    fn link_recursive(src: &Path, dst: &Path, force: bool) -> Result<Vec<LinkedFile>, Error> {
         let mut linked = Vec::new();
         if !dst.exists() {
             fs::create_dir_all(dst).map_err(Error::store("failed to create directory"))?;
@@ -227,9 +230,9 @@ impl Linker {
                     let old_target = fs::read_link(&dst_path)
                         .map_err(Error::store("failed to read symlink target"))?;
                     let _ = fs::remove_file(&dst_path);
-                    Self::link_recursive(&old_target, &dst_path)?;
+                    Self::link_recursive(&old_target, &dst_path, force)?;
                 }
-                linked.extend(Self::link_recursive(&src_path, &dst_path)?);
+                linked.extend(Self::link_recursive(&src_path, &dst_path, force)?);
                 continue;
             }
 
@@ -240,23 +243,28 @@ impl Linker {
                     } else {
                         target
                     };
-                    if fs::canonicalize(&resolved).ok() == fs::canonicalize(&src_path).ok() {
-                        if resolved.exists() {
-                            linked.push(LinkedFile {
-                                link_path: dst_path,
-                                target_path: src_path,
-                            });
-                            continue;
-                        } else {
-                            let _ = fs::remove_file(&dst_path);
-                        }
+
+                    if force {
+                        let _ = fs::remove_file(&dst_path);
                     } else {
-                        return Err(Error::LinkConflict {
-                            conflicts: vec![ConflictedLink {
-                                path: dst_path.clone(),
-                                owned_by: keg_name_from_symlink(&dst_path),
-                            }],
-                        });
+                        if fs::canonicalize(&resolved).ok() == fs::canonicalize(&src_path).ok() {
+                            if resolved.exists() {
+                                linked.push(LinkedFile {
+                                    link_path: dst_path,
+                                    target_path: src_path,
+                                });
+                                continue;
+                            } else {
+                                let _ = fs::remove_file(&dst_path);
+                            }
+                        } else {
+                            return Err(Error::LinkConflict {
+                                conflicts: vec![ConflictedLink {
+                                    path: dst_path.clone(),
+                                    owned_by: keg_name_from_symlink(&dst_path),
+                                }],
+                            });
+                        }
                     }
                 } else {
                     return Err(Error::LinkConflict {
@@ -472,7 +480,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let keg = setup_keg(&tmp, "foo");
         let linker = Linker::new(tmp.path()).unwrap();
-        linker.link_keg(&keg).unwrap();
+        linker.link_keg(&keg, false).unwrap();
         assert!(tmp.path().join("bin/foo").exists());
     }
 
@@ -487,8 +495,8 @@ mod tests {
         let keg2 = prefix.join("cellar/pkg2/1.0.0");
         fs::create_dir_all(keg2.join("lib/pkgconfig")).unwrap();
         fs::write(keg2.join("lib/pkgconfig/pkg2.pc"), b"").unwrap();
-        linker.link_keg(&keg1).unwrap();
-        linker.link_keg(&keg2).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
+        linker.link_keg(&keg2, false).unwrap();
         assert!(prefix.join("lib/pkgconfig/pkg1.pc").exists());
         assert!(prefix.join("lib/pkgconfig/pkg2.pc").exists());
     }
@@ -505,7 +513,7 @@ mod tests {
         fs::set_permissions(&helper, PermissionsExt::from_mode(0o755)).unwrap();
 
         let linker = Linker::new(tmp.path()).unwrap();
-        linker.link_keg(&keg).unwrap();
+        linker.link_keg(&keg, false).unwrap();
 
         let linked_helper = tmp.path().join("libexec/git-core/git-remote-https");
         assert!(linked_helper.exists(), "git-remote-https should be linked");
@@ -542,8 +550,8 @@ mod tests {
         )
         .unwrap();
 
-        linker.link_keg(&keg1).unwrap();
-        linker.link_keg(&keg2).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
+        linker.link_keg(&keg2, false).unwrap();
 
         // Metadata files should not be linked into shared prefix/libexec.
         assert!(!prefix.join("libexec/.gitignore").exists());
@@ -569,7 +577,7 @@ mod tests {
         let linker = Linker::new(prefix).unwrap();
 
         let keg1 = setup_keg(&tmp, "pkg1");
-        linker.link_keg(&keg1).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
 
         // Create a second keg with a conflicting binary name
         let keg2 = prefix.join("cellar/pkg2/1.0.0");
@@ -599,7 +607,7 @@ mod tests {
         fs::create_dir_all(&bin1).unwrap();
         fs::write(bin1.join("tool-a"), b"a").unwrap();
         fs::write(bin1.join("tool-b"), b"b").unwrap();
-        linker.link_keg(&keg1).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
 
         // Create keg2 with overlapping binaries
         let keg2 = prefix.join("Cellar/pkg2/1.0.0");
@@ -622,7 +630,7 @@ mod tests {
         let linker = Linker::new(prefix).unwrap();
 
         let keg1 = setup_keg(&tmp, "alpha");
-        linker.link_keg(&keg1).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
 
         // keg2 has a binary named "alpha" that conflicts
         let keg2 = prefix.join("cellar/beta/1.0.0");
@@ -631,7 +639,7 @@ mod tests {
         fs::write(bin2.join("alpha"), b"other").unwrap();
         fs::write(bin2.join("beta-only"), b"unique").unwrap();
 
-        assert!(linker.link_keg(&keg2).is_err());
+        assert!(linker.link_keg(&keg2, false).is_err());
         // The non-conflicting file should NOT have been linked (all-or-none)
         assert!(!prefix.join("bin/beta-only").exists());
         // The opt link should also not exist
@@ -666,8 +674,8 @@ mod tests {
         std::os::unix::fs::symlink("../gnuman", keg2.join("libexec/gnubin/man")).unwrap();
 
         // Both should link without conflicts
-        linker.link_keg(&keg1).unwrap();
-        linker.link_keg(&keg2).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
+        linker.link_keg(&keg2, false).unwrap();
 
         // Both man pages should be accessible
         assert!(prefix.join("libexec/gnubin/man/man1/sed.1").exists());
@@ -695,7 +703,7 @@ mod tests {
         #[cfg(unix)]
         std::os::unix::fs::symlink("realdir", keg2.join("libexec/alias")).unwrap();
 
-        linker.link_keg(&keg1).unwrap();
+        linker.link_keg(&keg1, false).unwrap();
         // Pre-flight check should pass since the files don't overlap
         assert!(linker.check_conflicts(&keg2).is_ok());
     }

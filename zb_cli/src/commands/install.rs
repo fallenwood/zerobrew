@@ -12,6 +12,7 @@ pub async fn execute(
     installer: &mut zb_io::Installer,
     formulas: Vec<String>,
     no_link: bool,
+    force: bool,
     build_from_source: bool,
     ui: &mut StdUi,
 ) -> Result<(), zb_core::Error> {
@@ -175,7 +176,7 @@ pub async fn execute(
         }));
 
         let result_val = installer
-            .execute_with_progress(plan, !no_link, Some(progress_callback))
+            .execute_with_progress(plan, !no_link, force, Some(progress_callback))
             .await;
 
         {
@@ -234,7 +235,7 @@ pub async fn execute(
             cask_names.len()
         ))
         .map_err(ui_error)?;
-        let result = installer.install_casks(&cask_names, !no_link).await?;
+        let result = installer.install_casks(&cask_names, !no_link, force).await?;
         installed_count += result.installed;
     }
 

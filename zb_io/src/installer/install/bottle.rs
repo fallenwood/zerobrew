@@ -19,6 +19,7 @@ impl Installer {
         download: &DownloadResult,
         download_progress: &Option<DownloadProgressCallback>,
         link: bool,
+        force: bool,
         report: &impl Fn(InstallProgress),
     ) -> Result<(), Error> {
         let InstallMethod::Bottle(ref bottle) = item.method else {
@@ -66,7 +67,7 @@ impl Installer {
             report(InstallProgress::LinkStarted {
                 name: formula_name.clone(),
             });
-            match self.linker.link_keg(&keg_path) {
+            match self.linker.link_keg(&keg_path, force) {
                 Ok(linked_files) => {
                     report(InstallProgress::LinkCompleted {
                         name: formula_name.clone(),
@@ -222,6 +223,7 @@ impl Installer {
         &mut self,
         token: &str,
         link: bool,
+        force: bool,
     ) -> Result<(), Error> {
         let cask_json = self.api_client.get_cask(token).await?;
         let cask = resolve_cask(token, &cask_json)?;
@@ -256,7 +258,7 @@ impl Installer {
         }
 
         let linked_files = if link {
-            self.linker.link_keg(&keg_path)?
+            self.linker.link_keg(&keg_path, force)?
         } else {
             Vec::new()
         };

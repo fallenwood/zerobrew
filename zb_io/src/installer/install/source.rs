@@ -107,7 +107,7 @@ impl Installer {
             report(InstallProgress::LinkStarted {
                 name: formula_name.clone(),
             });
-            match self.linker.link_keg(&keg_path) {
+            match self.linker.link_keg(&keg_path, false) {
                 Ok(files) => {
                     report(InstallProgress::LinkCompleted {
                         name: formula_name.clone(),

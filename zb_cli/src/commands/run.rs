@@ -25,7 +25,7 @@ pub async fn prepare_execution(
         );
 
         let plan = installer.plan(std::slice::from_ref(&normalized)).await?;
-        installer.execute(plan, false).await?;
+        installer.execute(plan, false, false).await?;
     }
 
     let installed =
@@ -327,7 +327,7 @@ mod tests {
         );
 
         installer
-            .install(&["alreadyinstalled".to_string()], false)
+            .install(&["alreadyinstalled".to_string()], false, false)
             .await
             .unwrap();
         assert!(installer.is_installed("alreadyinstalled"));

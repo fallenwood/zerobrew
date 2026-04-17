@@ -97,14 +97,15 @@ impl Installer {
         self.api_client.clear_cache()
     }
 
-    pub async fn execute(&mut self, plan: InstallPlan, link: bool) -> Result<ExecuteResult, Error> {
-        self.execute_with_progress(plan, link, None).await
+    pub async fn execute(&mut self, plan: InstallPlan, link: bool, force: bool) -> Result<ExecuteResult, Error> {
+        self.execute_with_progress(plan, link, force, None).await
     }
 
     pub async fn execute_with_progress(
         &mut self,
         plan: InstallPlan,
         link: bool,
+        force: bool,
         progress: Option<Arc<ProgressCallback>>,
     ) -> Result<ExecuteResult, Error> {
         let lock_path = self.locks_dir.join("install.lock");
@@ -167,6 +168,7 @@ impl Installer {
                                 &download,
                                 &download_progress,
                                 link,
+                                force,
                                 &report,
                             )
                             .await
@@ -210,7 +212,7 @@ impl Installer {
         Ok(ExecuteResult { installed })
     }
 
-    pub async fn install(&mut self, names: &[String], link: bool) -> Result<ExecuteResult, Error> {
+    pub async fn install(&mut self, names: &[String], link: bool, force: bool,) -> Result<ExecuteResult, Error> {
         let (casks, formulas): (Vec<_>, Vec<_>) = names
             .iter()
             .cloned()
@@ -220,11 +222,11 @@ impl Installer {
 
         if !formulas.is_empty() {
             let plan = self.plan(&formulas).await?;
-            installed += self.execute(plan, link).await?.installed;
+            installed += self.execute(plan, link, force).await?.installed;
         }
 
         if !casks.is_empty() {
-            installed += self.install_casks(&casks, link).await?.installed;
+            installed += self.install_casks(&casks, link, force).await?.installed;
         }
 
         Ok(ExecuteResult { installed })
@@ -234,13 +236,14 @@ impl Installer {
         &mut self,
         names: &[String],
         link: bool,
+        force: bool,
     ) -> Result<ExecuteResult, Error> {
         let mut installed = 0usize;
         for name in names {
             let token = name
                 .strip_prefix("cask:")
                 .expect("install_casks expects cask: prefixed names");
-            self.install_single_cask(token, link).await?;
+            self.install_single_cask(token, link, force).await?;
             installed += 1;
         }
         Ok(ExecuteResult { installed })
@@ -476,7 +479,7 @@ mod tests {
         );
 
         installer
-            .install(&["testpkg".to_string()], true)
+            .install(&["testpkg".to_string()], true, false)
             .await
             .unwrap();
 
@@ -562,7 +565,7 @@ mod tests {
         );
 
         installer
-            .install(&["mainpkg".to_string()], true)
+            .install(&["mainpkg".to_string()], true, false)
             .await
             .unwrap();
 
@@ -675,7 +678,7 @@ mod tests {
         );
 
         let result = installer
-            .install(&["goodpkg".to_string(), "badpkg".to_string()], false)
+            .install(&["goodpkg".to_string(), "badpkg".to_string()], false, false)
             .await;
         assert!(result.is_err());
 
@@ -756,7 +759,7 @@ mod tests {
         let conn = rusqlite::Connection::open(&db_path).unwrap();
         conn.execute("DROP TABLE installed_kegs", []).unwrap();
 
-        let result = installer.install(&["rollbackme".to_string()], true).await;
+        let result = installer.install(&["rollbackme".to_string()], true, false).await;
         assert!(result.is_err());
 
         assert!(!root.join("cellar/rollbackme/1.0.0").exists());
@@ -831,7 +834,7 @@ end
         conn.execute("DROP TABLE installed_kegs", []).unwrap();
 
         let result = installer
-            .install(&["hashicorp/tap/terraform".to_string()], true)
+            .install(&["hashicorp/tap/terraform".to_string()], true, false)
             .await;
         assert!(result.is_err());
 
@@ -940,7 +943,7 @@ end
         );
 
         installer
-            .install(&["root".to_string()], true)
+            .install(&["root".to_string()], true, false)
             .await
             .unwrap();
 
@@ -1024,7 +1027,7 @@ end
         );
 
         installer
-            .install(&["slowpkg".to_string()], true)
+            .install(&["slowpkg".to_string()], true, false)
             .await
             .unwrap();
 
@@ -1113,7 +1116,7 @@ end
         );
 
         installer
-            .install(&["retrypkg".to_string()], true)
+            .install(&["retrypkg".to_string()], true, false)
             .await
             .unwrap();
 

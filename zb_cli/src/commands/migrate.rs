@@ -89,6 +89,7 @@ pub async fn execute(
         formula_names.clone(),
         false, // no_link
         false, // build_from_source
+        false,
         ui,
     )
     .await

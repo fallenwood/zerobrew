@@ -123,7 +123,7 @@ mod tests {
         );
 
         installer
-            .install(&["uninstallme".to_string()], true)
+            .install(&["uninstallme".to_string()], true, false)
             .await
             .unwrap();
 
@@ -205,7 +205,7 @@ mod tests {
         );
 
         installer
-            .install(&["gctest".to_string()], true)
+            .install(&["gctest".to_string()], true, false)
             .await
             .unwrap();
 
@@ -296,7 +296,7 @@ mod tests {
         );
 
         installer
-            .install(&["keepme".to_string()], true)
+            .install(&["keepme".to_string()], true, false)
             .await
             .unwrap();
 
@@ -371,7 +371,7 @@ end
         );
 
         installer
-            .install(&["hashicorp/tap/terraform".to_string()], true)
+            .install(&["hashicorp/tap/terraform".to_string()], true, false)
             .await
             .unwrap();
 
@@ -451,7 +451,7 @@ end
             root.join("locks"),
         );
         installer
-            .install(&["terraform".to_string()], true)
+            .install(&["terraform".to_string()], true, false)
             .await
             .unwrap();
         assert!(installer.is_installed("terraform"));
