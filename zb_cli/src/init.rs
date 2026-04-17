@@ -277,6 +277,7 @@ export ZEROBREW_DIR={zerobrew_dir}
 export ZEROBREW_BIN={zerobrew_bin}
 export ZEROBREW_ROOT={root}
 export ZEROBREW_PREFIX={prefix}
+export HOMEBREW_PREFIX={prefix}
 export PKG_CONFIG_PATH="$ZEROBREW_PREFIX/lib/pkgconfig:${{PKG_CONFIG_PATH:-}}"
 
 # SSL/TLS certificates (only if ca-certificates is installed)
