@@ -76,6 +76,7 @@ pub struct ApiClient {
     client: reqwest::Client,
     cache: Option<ApiCache>,
     formula_candidates: RwLock<Option<Arc<[String]>>>,
+    cask_candidates: RwLock<Option<Arc<[String]>>>,
     alias_map: RwLock<Option<Arc<HashMap<String, String>>>>,
 }
 
@@ -122,6 +123,7 @@ impl ApiClient {
             client,
             cache: None,
             formula_candidates: RwLock::new(None),
+            cask_candidates: RwLock::new(None),
             alias_map: RwLock::new(None),
         }
     }
@@ -394,6 +396,42 @@ impl ApiClient {
         Ok(rank_formula_suggestions(query, &candidates, limit))
     }
 
+    pub async fn search_formulas(&self, query: &str) -> Result<Vec<String>, Error> {
+        if query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let candidates = self.formula_candidates().await?;
+        let query_lower = query.trim().to_ascii_lowercase();
+
+        let mut results: Vec<String> = candidates
+            .iter()
+            .filter(|name| name.to_ascii_lowercase().contains(&query_lower))
+            .cloned()
+            .collect();
+
+        results.sort();
+        Ok(results)
+    }
+
+    pub async fn search_casks(&self, query: &str) -> Result<Vec<String>, Error> {
+        if query.trim().is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let candidates = self.cask_candidates().await?;
+        let query_lower = query.trim().to_ascii_lowercase();
+
+        let mut results: Vec<String> = candidates
+            .iter()
+            .filter(|name| name.to_ascii_lowercase().contains(&query_lower))
+            .cloned()
+            .collect();
+
+        results.sort();
+        Ok(results)
+    }
+
     async fn formula_candidates(&self) -> Result<Arc<[String]>, Error> {
         if let Some(candidates) = self.formula_candidates.read().ok().and_then(|c| c.clone()) {
             return Ok(candidates);
@@ -447,6 +485,73 @@ impl ApiClient {
         if seen.insert(name.to_string()) {
             candidates.push(name.to_string());
         }
+    }
+
+    async fn cask_candidates(&self) -> Result<Arc<[String]>, Error> {
+        if let Some(candidates) = self.cask_candidates.read().ok().and_then(|c| c.clone()) {
+            return Ok(candidates);
+        }
+
+        let raw = self.get_all_casks_raw().await?;
+        let candidates: Arc<[String]> = Self::extract_cask_tokens(&raw)?.into();
+        if let Ok(mut cached) = self.cask_candidates.write() {
+            *cached = Some(Arc::clone(&candidates));
+        }
+        Ok(candidates)
+    }
+
+    async fn get_all_casks_raw(&self) -> Result<String, Error> {
+        let url = format!("{}.json", self.cask_base_url);
+
+        match self.cached_get(&url).await? {
+            CachedGetResult::Cached(body) => Ok(body),
+            CachedGetResult::Fresh(response) => {
+                if !response.status().is_success() {
+                    return Err(Error::NetworkFailure {
+                        message: format!(
+                            "bulk cask fetch returned HTTP {}",
+                            response.status()
+                        ),
+                    });
+                }
+
+                let etag = response
+                    .headers()
+                    .get("etag")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+                let last_modified = response
+                    .headers()
+                    .get("last-modified")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+
+                let body = response
+                    .text()
+                    .await
+                    .map_err(Error::network("failed to read bulk cask response body"))?;
+
+                self.store_response_in_cache(&url, etag, last_modified, &body);
+                Ok(body)
+            }
+        }
+    }
+
+    fn extract_cask_tokens(raw: &str) -> Result<Vec<String>, Error> {
+        #[derive(serde::Deserialize)]
+        struct CaskEntry {
+            #[serde(default)]
+            token: Option<String>,
+        }
+
+        let entries: Vec<CaskEntry> = serde_json::from_str(raw)
+            .map_err(Error::network("failed to parse bulk cask JSON"))?;
+
+        Ok(entries
+            .into_iter()
+            .filter_map(|e| e.token)
+            .filter(|t| !t.trim().is_empty())
+            .collect())
     }
 
     async fn get_alias_map(&self) -> Result<Arc<HashMap<String, String>>, Error> {

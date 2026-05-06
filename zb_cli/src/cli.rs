@@ -147,6 +147,10 @@ pub enum Commands {
         args: Vec<String>,
     },
     Update,
+    Search {
+        /// Search term to match against formula names
+        query: String,
+    },
     Outdated {
         /// Output as JSON
         #[arg(long, conflicts_with_all = ["quiet", "verbose"])]
