@@ -13,3 +13,4 @@ pub mod run;
 pub mod search;
 pub mod uninstall;
 pub mod update;
+pub mod upgrade;

@@ -147,6 +147,14 @@ pub enum Commands {
         args: Vec<String>,
     },
     Update,
+    Upgrade {
+        /// Package names to upgrade (requires at least one, or use --all)
+        #[arg(num_args = 1.., required_unless_present = "all")]
+        formulas: Vec<String>,
+        /// Upgrade all outdated packages
+        #[arg(long, conflicts_with = "formulas")]
+        all: bool,
+    },
     Search {
         /// Search term to match against formula names
         query: String,

@@ -82,6 +82,9 @@ async fn run(cli: Cli) -> Result<(), zb_core::Error> {
         Commands::Info { formula } => commands::info::execute(&mut installer, formula),
         Commands::Gc => commands::gc::execute(&mut installer),
         Commands::Update => commands::update::execute(&mut installer),
+        Commands::Upgrade { formulas, all } => {
+            commands::upgrade::execute(&mut installer, formulas, all, &mut ui).await
+        }
         Commands::Search { query } => commands::search::execute(&mut installer, query).await,
         Commands::Outdated { json } => {
             commands::outdated::execute(&mut installer, cli.quiet, cli.verbose > 0, json).await
