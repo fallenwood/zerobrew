@@ -1,14 +1,11 @@
 pub mod bundle;
 pub mod completion;
 pub mod doctor;
-pub mod export;
 pub mod gc;
-pub mod import;
 pub mod info;
 pub mod init;
 pub mod install;
 pub mod list;
-mod lockfile;
 pub mod migrate;
 pub mod outdated;
 pub mod reset;

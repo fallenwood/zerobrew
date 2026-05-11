@@ -89,12 +89,6 @@ async fn run(cli: Cli) -> Result<(), zb_core::Error> {
         Commands::Outdated { json } => {
             commands::outdated::execute(&mut installer, cli.quiet, cli.verbose > 0, json).await
         }
-        Commands::Export { file, force } => {
-            commands::export::execute(&mut installer, &file, force, &mut ui)
-        }
-        Commands::Import { file } => {
-            commands::import::execute(&mut installer, &file, &mut ui).await
-        }
         Commands::Reset { yes } => commands::reset::execute(&root, &prefix, yes, &mut ui),
         Commands::Run { formula, args } => {
             commands::run::execute(&mut installer, formula, args).await

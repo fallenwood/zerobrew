@@ -164,19 +164,6 @@ pub enum Commands {
         #[arg(long, conflicts_with_all = ["quiet", "verbose"])]
         json: bool,
     },
-    Export {
-        /// Output file path
-        #[arg(long, short = 'f', value_name = "FILE", default_value = "zerobrew.toml")]
-        file: PathBuf,
-        /// Overwrite existing file
-        #[arg(long)]
-        force: bool,
-    },
-    Import {
-        /// Input file path
-        #[arg(long, short = 'f', value_name = "FILE", default_value = "zerobrew.toml")]
-        file: PathBuf,
-    },
 }
 
 #[derive(Subcommand)]
